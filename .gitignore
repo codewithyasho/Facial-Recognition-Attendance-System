@@ -3,5 +3,7 @@ venv
 ./venv
 /venv
 
+.DS_Store
+serviceAccountKey.json
 
 /__pycache__/

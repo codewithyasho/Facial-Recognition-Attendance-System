@@ -3,3 +3,6 @@ uvicorn
 firebase-admin
 pydantic
 numpy
+python-multipart
+opencv-python-headless
+face_recognition
