@@ -7,6 +7,12 @@ WORKDIR /app
 # Copy the API requirements file
 COPY requirements-api.txt .
 
+# Install system dependencies required for building dlib
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install the backend dependencies
 RUN pip install --no-cache-dir -r requirements-api.txt
 
