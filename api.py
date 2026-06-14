@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -120,6 +120,54 @@ async def verify_image(file: UploadFile = File(...)):
     # This prevents the FastAPI event loop from being blocked, keeping the API fully asynchronous.
     response = await asyncio.to_thread(process_image_and_match, contents)
     
+    return response
+
+class RegistrationResponse(BaseModel):
+    success: bool
+    message: str
+
+def process_and_register(contents: bytes, name: str, club: str) -> RegistrationResponse:
+    try:
+        image_stream = io.BytesIO(contents)
+        rgb_image = face_recognition.load_image_file(image_stream)
+    except Exception as e:
+        return RegistrationResponse(success=False, message=f"Error processing image file: {str(e)}")
+
+    face_locations = face_recognition.face_locations(rgb_image)
+    
+    if len(face_locations) == 0:
+        return RegistrationResponse(success=False, message="Error: No face found in the image.")
+    elif len(face_locations) > 1:
+        return RegistrationResponse(success=False, message="Error: Multiple faces found. Please use a photo with only one person.")
+        
+    face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
+    embedding = face_encodings[0].tolist() 
+    
+    try:
+        doc_ref = db.collection("MEMBERS").document()
+        doc_ref.set({
+            "name": name,
+            "club": club,
+            "embedding": embedding
+        })
+        return RegistrationResponse(success=True, message=f"Member '{name}' successfully added to Firebase!")
+    except Exception as e:
+        return RegistrationResponse(success=False, message=f"Database error: {str(e)}")
+
+@app.post("/register", response_model=RegistrationResponse)
+async def register_member(
+    name: str = Form(...), 
+    club: str = Form(...), 
+    file: UploadFile = File(...)
+):
+    """
+    Endpoint for college faculty to add new members directly via the API.
+    """
+    if not db:
+        raise HTTPException(status_code=500, detail="Firebase is not configured.")
+
+    contents = await file.read()
+    response = await asyncio.to_thread(process_and_register, contents, name, club)
     return response
 
 @app.get("/")
