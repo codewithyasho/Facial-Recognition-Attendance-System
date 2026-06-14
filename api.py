@@ -49,17 +49,18 @@ def calculate_distance(embedding1, embedding2):
     return np.linalg.norm(np.array(embedding1) - np.array(embedding2))
 
 import asyncio
+import io
 
 def process_image_and_match(contents: bytes) -> VerificationResponse:
-    # 2. Convert raw bytes into an image that face_recognition can read
-    nparr = np.frombuffer(contents, np.uint8)
-    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    if image is None:
-        return VerificationResponse(verified=False, message="Error: Invalid image file.")
-        
-    # Convert BGR (OpenCV format) to RGB (face_recognition format)
-    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # 2. Convert raw bytes into an RGB image that face_recognition can read
+    # We use io.BytesIO and face_recognition's built-in loader because it handles
+    # EXIF orientation from mobile cameras and supports more formats than OpenCV.
+    try:
+        image_stream = io.BytesIO(contents)
+        rgb_image = face_recognition.load_image_file(image_stream)
+    except Exception as e:
+        return VerificationResponse(verified=False, message=f"Error processing image file: {str(e)}")
+
     
     # 3. Extract the embedding on the server
     face_locations = face_recognition.face_locations(rgb_image)
